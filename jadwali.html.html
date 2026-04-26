@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>جدول تنظيم الوقت</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
+            background: #1a1f2e;
+            color: #fff;
+            padding: 20px;
+            min-height: 100vh;
+        }
+
+       .container {
+            max-width: 500px;
+            margin: 0 auto;
+        }
+
+       .header {
+            text-align: center;
+            margin-bottom: 24px;
+        }
+
+       .header h1 {
+            font-size: 24px;
+            margin-bottom: 8px;
+        }
+
+       .header p {
+            color: #8b92a8;
+            font-size: 14px;
+        }
+
+       .time-card {
+            background: #252b3d;
+            border-radius: 16px;
+            padding: 24px;
+            text-align: center;
+            margin-bottom: 16px;
+        }
+
+       .current-time {
+            font-size: 48px;
+            font-weight: bold;
+            margin-bottom: 8px;
+            letter-spacing: 2px;
+        }
+
+       .current-date {
+            color: #8b92a8;
+            font-size: 14px;
+        }
+
+       .buttons {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 24px;
+        }
+
+       .btn {
+            flex: 1;
+            background: #6b5fff;
+            color: white;
+            border: none;
+            padding: 14px;
+            border-radius: 12px;
+            font-size: 15px;
+            font-weight: 600;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            transition: opacity 0.2s;
+        }
+
+       .btn:active {
+            opacity: 0.7;
+        }
+
+       .schedule-item {
+            background: #252b3d;
+            border-radius: 16px;
+            padding: 16px;
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            min-height: 72px;
+        }
+
+       .schedule-item.active {
+            background: #2d3548;
+            border: 2px solid #6b5fff;
+        }
+
+       .activity {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-size: 18px;
+            font-weight: 600;
+        }
+
+       .time-box {
+            background: #1a1f2e;
+            padding: 10px 16px;
+            border-radius: 20px;
+            font-size: 14px;
+            color: #8b92a8;
+            width: 200px;
+            text-align: center;
+            white-space: nowrap;
+        }
+
+       .emoji {
+            font-size: 24px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>جدول تنظيم الوقت</h1>
+            <p>نظم يومك وحقق أهدافك 🎯</p>
+        </div>
+
+        <div class="time-card">
+            <div class="current-time" id="currentTime">--:-- --</div>
+            <div class="current-date" id="currentDate">--/--/----</div>
+        </div>
+
+        <div class="buttons">
+            <button class="btn" onclick="testSound()">
+                <span>🔊</span>
+                <span>اختبار الصوت</span>
+            </button>
+            <button class="btn" onclick="enableNotifications()">
+                <span>🔔</span>
+                <span>تفعيل المنبهات</span>
+            </button>
+        </div>
+
+        <div id="scheduleList"></div>
+    </div>
+
+    <script>
+        const schedule = [
+            { activity: 'الاستيقاظ', emoji: '🌅', start: '08:00', end: '09:00' },
+            { activity: 'الفطور', emoji: '☕', start: '09:00', end: '09:30' },
+            { activity: 'مذاكرة', emoji: '📚', start: '09:30', end: '12:30' },
+            { activity: 'بريك', emoji: '⏸️', start: '12:30', end: '13:30' },
+            { activity: 'مذاكرة', emoji: '📚', start: '13:30', end: '15:30' },
+            { activity: 'بريك', emoji: '⏸️', start: '15:30', end: '18:30' },
+            { activity: 'مذاكرة', emoji: '📚', start: '18:30', end: '20:30' },
+            { activity: 'بريك', emoji: '⏸️', start: '20:30', end: '00:00' },
+            { activity: 'نوم', emoji: '😴', start: '00:00', end: '08:00' }
+        ];
+
+        let alarmsEnabled = false;
+        let audioContext;
+        let triggeredAlarms = new Set();
+
+        function formatTime12(time24) {
+            const [hours, minutes] = time24.split(':');
+            const h = parseInt(hours);
+            const period = h >= 12? 'م' : 'ص';
+            const h12 = h % 12 || 12;
+            return `${h12}:${minutes} ${period}`;
+        }
+
+        function updateTime() {
+            const now = new Date();
+            let hours = now.getHours();
+            const minutes = now.getMinutes().toString().padStart(2, '0');
+            const seconds = now.getSeconds().toString().padStart(2, '0');
+            const period = hours >= 12? 'م' : 'ص';
+            hours = hours % 12 || 12;
+
+            document.getElementById('currentTime').textContent =
+                `${hours}:${minutes}:${seconds} ${period}`;
+
+            const day = now.getDate().toString().padStart(2, '0');
+            const month = (now.getMonth() + 1).toString().padStart(2, '0');
+            const year = now.getFullYear();
+            document.getElementById('currentDate').textContent = `${day}/${month}/${year}`;
+
+            checkAlarms(now);
+            updateActiveSchedule(now);
+        }
+
+        function updateActiveSchedule(now) {
+            const currentMinutes = now.getHours() * 60 + now.getMinutes();
+            const items = document.querySelectorAll('.schedule-item');
+
+            schedule.forEach((item, index) => {
+                const [startH, startM] = item.start.split(':').map(Number);
+                const [endH, endM] = item.end.split(':').map(Number);
+                let startMinutes = startH * 60 + startM;
+                let endMinutes = endH * 60 + endM;
+
+                if (endMinutes < startMinutes) endMinutes += 24 * 60;
+                let current = currentMinutes;
+                if (currentMinutes < startMinutes && endMinutes > 24 * 60) {
+                    current += 24 * 60;
+                }
+
+                if (current >= startMinutes && current < endMinutes) {
+                    items[index]?.classList.add('active');
+                } else {
+                    items[index]?.classList.remove('active');
+                }
+            });
+        }
+
+        function renderSchedule() {
+            const list = document.getElementById('scheduleList');
+            list.innerHTML = schedule.map(item => `
+                <div class="schedule-item">
+                    <div class="activity">
+                        <span>${item.activity}</span>
+                        <span class="emoji">${item.emoji}</span>
+                    </div>
+                    <div class="time-box">
+                        ${formatTime12(item.start)} - ${formatTime12(item.end)}
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function initAudio() {
+            if (!audioContext) {
+                audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            }
+        }
+
+        function playAlarm() {
+            initAudio();
+            const duration = 0.5;
+            const times = 3;
+
+            for (let i = 0; i < times; i++) {
+                setTimeout(() => {
+                    const oscillator = audioContext.createOscillator();
+                    const gainNode = audioContext.createGain();
+
+                    oscillator.connect(gainNode);
+                    gainNode.connect(audioContext.destination);
+
+                    oscillator.frequency.value = 800;
+                    oscillator.type = 'square';
+
+                    gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+                    gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + duration);
+
+                    oscillator.start(audioContext.currentTime);
+                    oscillator.stop(audioContext.currentTime + duration);
+                }, i * 600);
+            }
+        }
+
+        function testSound() {
+            playAlarm();
+            alert('🔊 تم اختبار الصوت بنجاح');
+        }
+
+        function enableNotifications() {
+            alarmsEnabled = true;
+            initAudio();
+            if ('Notification' in window && Notification.permission === 'default') {
+                Notification.requestPermission();
+            }
+            alert('🔔 تم تفعيل المنبهات! راح يشتغل صوت عالي مع بداية كل نشاط');
+        }
+
+        function checkAlarms(now) {
+            if (!alarmsEnabled) return;
+
+            const currentTime = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
+
+            schedule.forEach(item => {
+                if (item.start === currentTime &&!triggeredAlarms.has(item.start)) {
+                    triggeredAlarms.add(item.start);
+                    playAlarm();
+
+                    if ('Notification' in window && Notification.permission === 'granted') {
+                        new Notification('⏰ ' + item.activity, {
+                            body: `حان وقت ${item.activity} ${item.emoji}`,
+                            icon: 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><text y="0.9em" font-size="90">⏰</text></svg>'
+                        });
+                    }
+
+                    setTimeout(() => triggeredAlarms.delete(item.start), 60000);
+                }
+            });
+        }
+
+        renderSchedule();
+        updateTime();
+        setInterval(updateTime, 1000);
+    </script>
+</body>
+</html>
